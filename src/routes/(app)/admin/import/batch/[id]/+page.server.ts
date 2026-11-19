@@ -1,0 +1,29 @@
+import { error } from '@sveltejs/kit';
+import { requireUser } from '#lib/server/auth/guards.js';
+import { DomainError } from '#lib/server/errors.js';
+import { getImportBatch } from '#lib/server/services/imports.js';
+import type { PageServerLoad } from './$types';
+
+function parseId(value: string): number | null {
+	const id = Number(value);
+	return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+export const load: PageServerLoad = async ({ locals, params, url }) => {
+	const actor = requireUser(locals, url);
+	const id = parseId(params.id);
+	if (id === null) throw error(404, 'Batch impor tidak ditemukan.');
+
+	try {
+		const detail = await getImportBatch(actor, id);
+		return {
+			...detail,
+			failedRows: detail.rows.filter((row) => row.status === 'failed')
+		};
+	} catch (err) {
+		if (err instanceof DomainError) {
+			throw error(err.code === 'TIDAK_DITEMUKAN' ? 404 : 403, err.message);
+		}
+		throw err;
+	}
+};

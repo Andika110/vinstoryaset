@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: inventory_owner
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: inventory
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://inventory_app:inventory_app@127.0.0.1:5432/inventory
+      DATABASE_URL_MIGRATE: postgres://inventory_owner:postgres@127.0.0.1:5432/inventory
+      SESSION_SECRET: ci-session-secret-minimum-32-characters
+      ORIGIN: http://localhost:3000
+      PORT: '3000'
+      UPLOAD_DIR: ./data/uploads
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Create application database role
+        run: |
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U inventory_owner -d inventory -v ON_ERROR_STOP=1 -c "
+            DO \$\$ BEGIN
+              IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'inventory_app') THEN
+                CREATE ROLE inventory_app LOGIN PASSWORD 'inventory_app';
+              END IF;
+            END \$\$;
+          "
+
+      - name: Apply migrations
+        run: bun run db:migrate
+
+      - name: Type check
+        run: bun run check
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Unit, integration, and smoke tests
+        run: bun run test
+
+      - name: Build
+        run: bun run build

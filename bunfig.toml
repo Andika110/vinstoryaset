@@ -1,0 +1,7 @@
+# Force `bun run <script>` to execute scripts with the Bun runtime.
+# The SvelteKit adapter for Bun requires the production build to run under Bun.
+[run]
+bun = true
+
+[test]
+preload = ["./tests/setup.ts"]

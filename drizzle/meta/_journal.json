@@ -1,0 +1,62 @@
+{
+	"version": "7",
+	"dialect": "postgresql",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "7",
+			"when": 1795044051959,
+			"tag": "0000_curvy_jack_murdock",
+			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "7",
+			"when": 1795045835705,
+			"tag": "0001_gray_robin_chapel",
+			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "7",
+			"when": 1795045844501,
+			"tag": "0002_audit_privileges",
+			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "7",
+			"when": 1795045917756,
+			"tag": "0003_classy_dreaming_celestial",
+			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "7",
+			"when": 1795051236694,
+			"tag": "0004_deep_magik",
+			"breakpoints": true
+		},
+		{
+			"idx": 5,
+			"version": "7",
+			"when": 1795053521737,
+			"tag": "0005_lonely_molecule_man",
+			"breakpoints": true
+		},
+		{
+			"idx": 6,
+			"version": "7",
+			"when": 1795055417813,
+			"tag": "0006_outstanding_micromax",
+			"breakpoints": true
+		},
+		{
+			"idx": 7,
+			"version": "7",
+			"when": 1795056000000,
+			"tag": "0007_import_privileges",
+			"breakpoints": true
+		}
+	]
+}

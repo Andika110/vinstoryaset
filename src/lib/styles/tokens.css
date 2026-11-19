@@ -1,0 +1,221 @@
+/*
+ * Design tokens — Design System v1
+ * Komponen wajib memakai token peran (mis. --primary, --text-2, --border-strong),
+ * bukan nilai hex langsung. Nilai palette hanya didefinisikan di file ini.
+ */
+
+:root {
+	color-scheme: light;
+
+	/* Palette — Teal */
+	--teal-50: #f0fdfa;
+	--teal-100: #ccfbf1;
+	--teal-200: #99f6e4;
+	--teal-300: #5eead4;
+	--teal-400: #2dd4bf;
+	--teal-500: #14b8a6;
+	--teal-600: #0d9488;
+	--teal-700: #0f766e;
+	--teal-800: #115e59;
+	--teal-900: #134e4a;
+
+	/* Palette — Slate */
+	--slate-50: #f8fafc;
+	--slate-100: #f1f5f9;
+	--slate-200: #e2e8f0;
+	--slate-300: #cbd5e1;
+	--slate-400: #94a3b8;
+	--slate-500: #64748b;
+	--slate-600: #475569;
+	--slate-700: #334155;
+	--slate-800: #1e293b;
+	--slate-900: #0f172a;
+	--slate-950: #020617;
+
+	/* Primary */
+	--primary: var(--teal-700);
+	--primary-hover: var(--teal-800);
+	--primary-active: var(--teal-900);
+	--primary-contrast: #ffffff;
+	--primary-soft: var(--teal-100);
+	--primary-soft-text: var(--teal-900);
+
+	/* Text — rasio terhadap --bg: 17.06, 7.24, 4.55 */
+	--text-1: var(--slate-900);
+	--text-2: var(--slate-600);
+	--text-3: var(--slate-500);
+
+	/* Surface & border */
+	--bg: var(--slate-50);
+	--surface: #ffffff;
+	--surface-2: var(--slate-100);
+	--surface-3: var(--slate-200);
+	--border: var(--slate-200);
+	--border-strong: var(--slate-500); /* 4.76:1 terhadap putih */
+	--overlay: rgb(15 23 42 / 0.48);
+
+	/* Link & focus */
+	--link: var(--teal-700);
+	--link-hover: var(--teal-900);
+	--focus: var(--teal-700);
+
+	/* Status — teks di atas background status memenuhi AA */
+	--success: #15803d;
+	--success-bg: #dcfce7;
+	--success-text: #15803d;
+	--success-border: #15803d;
+	--success-contrast: #ffffff;
+
+	--warning: #b45309;
+	--warning-bg: #fef3c7;
+	--warning-text: #92400e;
+	--warning-border: #b45309;
+	--warning-contrast: #ffffff;
+
+	--danger: #b91c1c;
+	--danger-bg: #fee2e2;
+	--danger-text: #b91c1c;
+	--danger-border: #b91c1c;
+	--danger-contrast: #ffffff;
+
+	--info: #1d4ed8;
+	--info-bg: #dbeafe;
+	--info-text: #1d4ed8;
+	--info-border: #1d4ed8;
+	--info-contrast: #ffffff;
+
+	--neutral-bg: var(--slate-100);
+	--neutral-text: var(--slate-700);
+	--neutral-border: var(--slate-500);
+
+	/* Typography */
+	--font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, 'Cascadia Code', Consolas, monospace;
+
+	--font-size-xs: 0.75rem; /* 12px — hanya keterangan tambahan */
+	--font-size-sm: 0.875rem; /* 14px */
+	--font-size-base: 1rem; /* 16px — minimum input */
+	--font-size-lg: 1.125rem; /* 18px */
+	--font-size-xl: 1.25rem; /* 20px */
+	--font-size-2xl: 1.5rem; /* 24px */
+	--font-size-3xl: 1.875rem; /* 30px */
+	--font-size-4xl: 2.25rem; /* 36px */
+
+	--leading-tight: 1.25;
+	--leading-normal: 1.5;
+	--leading-relaxed: 1.65;
+
+	--weight-regular: 400;
+	--weight-medium: 500;
+	--weight-semibold: 600;
+	--weight-bold: 700;
+
+	--tracking-tight: -0.01em;
+	--tracking-normal: 0;
+
+	/* Spacing */
+	--space-1: 0.25rem; /* 4px */
+	--space-2: 0.5rem; /* 8px */
+	--space-3: 0.75rem; /* 12px */
+	--space-4: 1rem; /* 16px */
+	--space-5: 1.5rem; /* 24px */
+	--space-6: 2rem; /* 32px */
+	--space-7: 3rem; /* 48px */
+	--space-8: 4rem; /* 64px */
+
+	/* Radius */
+	--radius-sm: 4px;
+	--radius-md: 8px;
+	--radius-lg: 12px;
+	--radius-full: 9999px;
+
+	/* Shadow */
+	--shadow-1: 0 1px 2px rgb(15 23 42 / 0.06), 0 1px 3px rgb(15 23 42 / 0.1);
+	--shadow-2: 0 10px 15px -3px rgb(15 23 42 / 0.12), 0 4px 6px -4px rgb(15 23 42 / 0.1);
+
+	/* Layout */
+	--container-max: 1280px;
+	--gutter: 16px;
+	--gutter-md: 24px;
+	--gutter-lg: 32px;
+	--touch-target: 44px;
+	--touch-target-dense: 36px;
+
+	/* Breakpoint (referensi; media query memakai nilai px langsung) */
+	--bp-sm: 640px;
+	--bp-md: 768px;
+	--bp-lg: 1024px;
+	--bp-xl: 1280px;
+
+	/* Motion */
+	--motion-fast: 140ms;
+	--motion-ease: cubic-bezier(0.2, 0, 0, 1);
+
+	/* Layer */
+	--z-header: 100;
+	--z-dropdown: 200;
+	--z-dialog: 300;
+	--z-toast: 400;
+}
+
+/*
+ * Mode gelap disiapkan tetapi tidak dipaksakan di v1.
+ * Aktifkan dengan <html data-theme="dark"> saat fitur mode gelap dibuka.
+ */
+[data-theme='dark'] {
+	color-scheme: dark;
+
+	--primary: var(--teal-300);
+	--primary-hover: var(--teal-200);
+	--primary-active: var(--teal-100);
+	--primary-contrast: #042f2e;
+	--primary-soft: var(--teal-900);
+	--primary-soft-text: var(--teal-100);
+
+	--text-1: var(--slate-50);
+	--text-2: var(--slate-300);
+	--text-3: var(--slate-400);
+
+	--bg: var(--slate-950);
+	--surface: var(--slate-900);
+	--surface-2: var(--slate-800);
+	--surface-3: var(--slate-700);
+	--border: var(--slate-700);
+	--border-strong: var(--slate-500);
+	--overlay: rgb(2 6 23 / 0.72);
+
+	--link: var(--teal-300);
+	--link-hover: var(--teal-200);
+	--focus: var(--teal-300);
+
+	--success: #4ade80;
+	--success-bg: #052e16;
+	--success-text: #4ade80;
+	--success-border: #4ade80;
+	--success-contrast: #052e16;
+
+	--warning: #fbbf24;
+	--warning-bg: #451a03;
+	--warning-text: #fbbf24;
+	--warning-border: #fbbf24;
+	--warning-contrast: #451a03;
+
+	--danger: #f87171;
+	--danger-bg: #450a0a;
+	--danger-text: #f87171;
+	--danger-border: #f87171;
+	--danger-contrast: #450a0a;
+
+	--info: #60a5fa;
+	--info-bg: #172554;
+	--info-text: #60a5fa;
+	--info-border: #60a5fa;
+	--info-contrast: #172554;
+
+	--neutral-bg: var(--slate-800);
+	--neutral-text: var(--slate-200);
+	--neutral-border: var(--slate-500);
+
+	--shadow-1: 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.45);
+	--shadow-2: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.45);
+}

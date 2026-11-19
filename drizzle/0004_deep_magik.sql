@@ -1,0 +1,2 @@
+ALTER TABLE "asset_movements" ADD COLUMN "submission_id" uuid;--> statement-breakpoint
+CREATE UNIQUE INDEX "asset_movements_submission_unique" ON "asset_movements" USING btree ("submission_id") WHERE "asset_movements"."submission_id" IS NOT NULL;
