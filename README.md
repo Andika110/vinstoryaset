@@ -892,6 +892,8 @@ FEAT-12, FEAT-13, FEAT-14, FEAT-15, FEAT-16, FEAT-17, FEAT-18, dan FEAT-19.
 - `PRD_v1.1.md` — kebutuhan produk
 - `ARCHITECTURE.md` — arsitektur dan deployment
 - `DEPLOYMENT.md` — langkah deploy PC kantor, Cloudflare Tunnel, backup & restore
+- `MENJALANKAN_APLIKASI.md` — cara start/stop server, health check, dan troubleshooting
+- `TESTING.md` — panduan uji manual per peran dan alur bisnis
 - `design_pattern.md` — pattern transaksi, audit, stok
 - `Design_UI.md` — halaman dan komponen per fitur
 - `Design System v1 – Aset & Inventory IT.md` — token dan komponen visual

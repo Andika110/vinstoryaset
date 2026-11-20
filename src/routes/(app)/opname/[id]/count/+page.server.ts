@@ -37,7 +37,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			summary: detail.summary,
 			conditions: detail.conditions,
 			resultOptions: OPNAME_RESULT_OPTIONS,
-			saved: url.searchParams.get('saved') === '1'
+			canScan: detail.opname.itemType === 'asset'
 		};
 	} catch (err) {
 		if (err instanceof DomainError) {
@@ -48,46 +48,42 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 };
 
 export const actions: Actions = {
-	save: async ({ request, locals, params, url }) => {
+	/**
+	 * Menyimpan satu baris tanpa JavaScript. Antarmuka normal memakai endpoint
+	 * `/opname/[id]/count/save` agar bisa autosave tanpa memuat ulang halaman.
+	 */
+	saveLine: async ({ request, locals, params, url }) => {
 		const actor = requireUser(locals, url);
 		const id = parseId(params.id);
 		if (id === null) throw error(404, 'Sesi opname tidak ditemukan.');
 
-		let detail;
-		try {
-			detail = await getOpnameDetail(actor, id);
-		} catch (err) {
-			if (err instanceof DomainError) {
-				throw error(err.code === 'TIDAK_DITEMUKAN' ? 404 : 403, err.message);
-			}
-			throw err;
-		}
 		const form = await request.formData();
-		const inputs: OpnameCountInput[] = detail.lines.map((line) => ({
-			lineId: line.id,
-			result: String(form.get(`result_${line.id}`) ?? '').trim(),
-			conditionId: integerOrNull(form.get(`condition_${line.id}`)),
-			physicalQty:
-				line.itemType === 'inventory' ? integerOrNull(form.get(`physical_${line.id}`)) : null,
-			notes: String(form.get(`notes_${line.id}`) ?? '').trim() || null
-		}));
+		const lineId = Number(form.get('lineId'));
+		if (!Number.isInteger(lineId) || lineId <= 0) {
+			return fail(400, { error: 'Baris opname tidak valid.' });
+		}
+
+		const input: OpnameCountInput = {
+			lineId,
+			result: String(form.get('result') ?? '').trim(),
+			conditionId: integerOrNull(form.get('conditionId')),
+			physicalQty: integerOrNull(form.get('physicalQty')),
+			notes: String(form.get('notes') ?? '').trim() || null
+		};
 
 		if (
-			inputs.some(
-				(input) =>
-					(input.conditionId !== null && !Number.isInteger(input.conditionId)) ||
-					(input.physicalQty !== null && !Number.isInteger(input.physicalQty))
-			)
+			(input.conditionId !== null && !Number.isInteger(input.conditionId)) ||
+			(input.physicalQty !== null && !Number.isInteger(input.physicalQty))
 		) {
 			return fail(400, { error: 'Jumlah fisik dan kondisi harus berupa angka yang valid.' });
 		}
 
 		try {
-			await saveOpnameCount(actor, id, inputs);
-			throw redirect(303, `/opname/${id}/count?saved=1`);
+			await saveOpnameCount(actor, id, [input]);
+			return { lineSaved: true, savedLineId: lineId };
 		} catch (err) {
 			if (err instanceof DomainError) {
-				return fail(400, { error: err.message });
+				return fail(400, { error: err.message, lineId });
 			}
 			throw err;
 		}

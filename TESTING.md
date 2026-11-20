@@ -305,14 +305,32 @@ Login admin/support.
 - variance dihitung;
 - stok tidak berubah otomatis.
 
-### 6.2 Outlet scope
+### 6.3 Mode scan & autosave (aset)
 
-1. Login Outlet.
-2. Buka `/opname`.
-3. Pastikan hanya sesi outletnya yang tampil.
-4. Buka sesi HO secara langsung.
+1. Login Support/Admin.
+2. Buat sesi opname aset di lokasi yang punya aset + `Mulai sesi`.
+3. Buka **Isi hitung**.
+4. Uji Opsi 2:
+   - filter **Belum dicek**, cari kode aset;
+   - ketuk **Sesuai** → baris berubah status tanpa reload;
+   - ketuk **Batalkan** → kembali belum dicek;
+   - **Ubah** → isi kondisi berbeda + catatan → **Simpan**.
+5. Uji Opsi 1:
+   - ketuk **Mulai scan**;
+   - ketik kode aset di “Atau ketik kode aset” → **Cek**;
+   - baris ditandai sesuai, progress naik, toast muncul;
+   - scan ulang kode yang sama → toast “sudah dicek”;
+   - scan kode aset di lokasi lain → toast “Bukan di sesi ini”;
+   - scan kode tidak dikenal → toast “Tidak ditemukan”.
+6. Uji tanpa JavaScript (matikan JS di browser):
+   - ketuk **Sesuai** / **Simpan** per baris → progres tetap tersimpan.
 
-**Harus berhasil:** sesi HO dijawab 404/tidak ditemukan.
+**Harus berhasil:**
+
+- tidak ada kehilangan input saat reload;
+- autosave per item;
+- progress bar sticky;
+- kamera memerlukan HTTPS/localhost (di produksi via Cloudflare Tunnel).
 
 ---
 

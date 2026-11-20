@@ -1060,6 +1060,15 @@ type PreviewInternal = {
 	createdAt: number;
 	confirmedBatchId: number | null;
 	processing: boolean;
+	autoCreate: boolean;
+	autoCreated: {
+		inventoryCategories: string[];
+		units: string[];
+		brands: string[];
+		assetCategories: string[];
+		conditions: string[];
+		models: string[];
+	};
 };
 
 export type ImportPreviewView = {
@@ -1070,6 +1079,14 @@ export type ImportPreviewView = {
 	validCount: number;
 	invalidCount: number;
 	rows: ValidatedImportRow[];
+	autoCreated: {
+		inventoryCategories: string[];
+		units: string[];
+		brands: string[];
+		assetCategories: string[];
+		conditions: string[];
+		models: string[];
+	};
 };
 
 const PREVIEW_TTL_MS = 30 * 60 * 1000;
@@ -1091,7 +1108,8 @@ function previewView(preview: PreviewInternal): ImportPreviewView {
 		total: preview.rows.length,
 		validCount,
 		invalidCount: preview.rows.length - validCount,
-		rows: preview.rows
+		rows: preview.rows,
+		autoCreated: preview.autoCreated
 	};
 }
 
@@ -1099,10 +1117,23 @@ export async function createImportPreview(
 	actor: AuthUser,
 	type: ImportTypeKey,
 	fileName: string,
-	rows: RawImportRow[]
+	rows: RawImportRow[],
+	autoCreate = false
 ): Promise<ImportPreviewView> {
 	assertImportAccess(actor);
 	const definition = requireImportType(type);
+
+	const autoCreated = autoCreate
+		? await autoCreateMissingMasterData(actor, type, rows)
+		: {
+				inventoryCategories: [] as string[],
+				units: [] as string[],
+				brands: [] as string[],
+				assetCategories: [] as string[],
+				conditions: [] as string[],
+				models: [] as string[]
+			};
+
 	const validated = await validateImportRows(definition.key, rows);
 	purgePreviews();
 	const token = randomUUID();
@@ -1114,7 +1145,9 @@ export async function createImportPreview(
 		rows: validated,
 		createdAt: Date.now(),
 		confirmedBatchId: null,
-		processing: false
+		processing: false,
+		autoCreate,
+		autoCreated
 	};
 	previews.set(token, preview);
 	return previewView(preview);
@@ -1131,6 +1164,189 @@ export async function getImportPreview(actor: AuthUser, token: string): Promise<
 		);
 	}
 	return previewView(preview);
+}
+
+async function autoCreateMissingMasterData(
+	actor: AuthUser,
+	type: ImportTypeKey,
+	rows: RawImportRow[]
+): Promise<{
+	inventoryCategories: string[];
+	units: string[];
+	brands: string[];
+	assetCategories: string[];
+	conditions: string[];
+	models: string[];
+}> {
+	const refs = await loadReferenceData();
+	const created = {
+		inventoryCategories: [] as string[],
+		units: [] as string[],
+		brands: [] as string[],
+		assetCategories: [] as string[],
+		conditions: [] as string[],
+		models: [] as string[]
+	};
+
+	const missingInventoryCategories = new Set<string>();
+	const missingUnits = new Set<string>();
+	const missingBrands = new Set<string>();
+	const missingAssetCategories = new Set<string>();
+	const missingConditions = new Set<string>();
+	const missingModels = new Set<string>();
+
+	for (const row of rows) {
+		const values = row.values;
+		if (type === 'inventory-item') {
+			const category = (values.category ?? '').trim();
+			if (category && !refs.inventoryCategoryByName.has(canonical(category))) {
+				missingInventoryCategories.add(category);
+			}
+			const unit = (values.unit ?? '').trim();
+			if (unit && !refs.unitByKey.has(canonical(unit))) {
+				missingUnits.add(unit);
+			}
+			const brand = (values.brand ?? '').trim();
+			if (brand && !refs.brandByName.has(canonical(brand))) {
+				missingBrands.add(brand);
+			}
+		} else if (type === 'asset') {
+			const category = (values.category ?? '').trim();
+			if (category && !refs.assetCategoryByName.has(canonical(category))) {
+				missingAssetCategories.add(category);
+			}
+			const condition = (values.condition ?? '').trim();
+			if (condition && !refs.assetConditionByName.has(canonical(condition))) {
+				missingConditions.add(condition);
+			}
+			const brand = (values.brand ?? '').trim();
+			if (brand && !refs.brandByName.has(canonical(brand))) {
+				missingBrands.add(brand);
+			}
+		}
+	}
+
+	await db.transaction(async (tx) => {
+		for (const name of missingInventoryCategories) {
+			const inserted = await tx
+				.insert(inventoryCategories)
+				.values({ name, isActive: true })
+				.onConflictDoNothing()
+				.returning({ id: inventoryCategories.id });
+			if (inserted.length > 0) {
+				created.inventoryCategories.push(name);
+				refs.inventoryCategoryByName.set(canonical(name), inserted[0].id);
+			}
+		}
+		for (const name of missingUnits) {
+			const inserted = await tx
+				.insert(units)
+				.values({ name, abbreviation: name, isActive: true })
+				.onConflictDoNothing()
+				.returning({ id: units.id });
+			if (inserted.length > 0) {
+				created.units.push(name);
+				refs.unitByKey.set(canonical(name), inserted[0].id);
+			}
+		}
+		for (const name of missingBrands) {
+			const inserted = await tx
+				.insert(brands)
+				.values({ name, isActive: true })
+				.onConflictDoNothing()
+				.returning({ id: brands.id });
+			if (inserted.length > 0) {
+				created.brands.push(name);
+				refs.brandByName.set(canonical(name), inserted[0].id);
+			}
+		}
+		for (const name of missingAssetCategories) {
+			const inserted = await tx
+				.insert(assetCategories)
+				.values({ name, isActive: true })
+				.onConflictDoNothing()
+				.returning({ id: assetCategories.id });
+			if (inserted.length > 0) {
+				created.assetCategories.push(name);
+				refs.assetCategoryByName.set(canonical(name), inserted[0].id);
+			}
+		}
+		for (const name of missingConditions) {
+			const inserted = await tx
+				.insert(assetConditions)
+				.values({ name, isActive: true })
+				.onConflictDoNothing()
+				.returning({ id: assetConditions.id });
+			if (inserted.length > 0) {
+				created.conditions.push(name);
+				refs.assetConditionByName.set(canonical(name), inserted[0].id);
+			}
+		}
+
+		if (type === 'asset') {
+			for (const row of rows) {
+				const model = (row.values.model ?? '').trim();
+				const brand = (row.values.brand ?? '').trim();
+				const category = (row.values.category ?? '').trim();
+				if (!model || !brand || !category) continue;
+				const brandId = refs.brandByName.get(canonical(brand));
+				const categoryId = refs.assetCategoryByName.get(canonical(category));
+				if (!brandId || !categoryId) continue;
+				if (refs.modelByKey.has(`${brandId}:${canonical(model)}`)) continue;
+				missingModels.add(`${brandId}:${categoryId}:${model}`);
+			}
+		}
+
+		for (const key of missingModels) {
+			const [brandIdRaw, categoryIdRaw, ...modelParts] = key.split(':');
+			const brandId = Number(brandIdRaw);
+			const categoryId = Number(categoryIdRaw);
+			const modelName = modelParts.join(':');
+			if (!Number.isInteger(brandId) || !Number.isInteger(categoryId) || !modelName) continue;
+			const inserted = await tx
+				.insert(assetModels)
+				.values({
+					brandId,
+					categoryId,
+					name: modelName,
+					isActive: true
+				})
+				.onConflictDoNothing()
+				.returning({ id: assetModels.id });
+			if (inserted.length > 0) {
+				created.models.push(modelName);
+				refs.modelByKey.set(`${brandId}:${canonical(modelName)}`, {
+					id: inserted[0].id,
+					categoryId
+				});
+			}
+		}
+		const totalCreated =
+			created.inventoryCategories.length +
+			created.units.length +
+			created.brands.length +
+			created.assetCategories.length +
+			created.conditions.length +
+			created.models.length;
+		if (totalCreated > 0) {
+			await writeAudit(tx, actor, {
+				module: 'import',
+				action: 'import_auto_create_master_data',
+				recordId: type,
+				newValue: {
+					type,
+					inventoryCategories: created.inventoryCategories,
+					units: created.units,
+					brands: created.brands,
+					assetCategories: created.assetCategories,
+					conditions: created.conditions,
+					models: created.models
+				}
+			});
+		}
+	});
+
+	return created;
 }
 
 function rowErrorMessage(error: unknown): string {

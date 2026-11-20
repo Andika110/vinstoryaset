@@ -41,6 +41,28 @@
 					maxSizeMB={5}
 					required
 				/>
+				{#if data.type.key === 'asset' || data.type.key === 'inventory-item'}
+					<label class="auto-create">
+						<input type="checkbox" name="auto_create" />
+						<span>
+							Buat otomatis
+							{#if data.type.key === 'asset'}
+								kategori, kondisi, brand, dan model
+							{:else}
+								kategori, satuan, dan brand
+							{/if}
+							yang belum ada di Master Data
+						</span>
+					</label>
+					<p class="auto-create-hint">
+						{#if data.type.key === 'asset'}
+							Kategori, kondisi, brand, dan model yang belum ada akan dibuat saat pratinjau.
+						{:else}
+							Kategori, satuan, dan brand yang belum ada akan dibuat saat pratinjau.
+						{/if}
+						Pembuatan tercatat di audit log.
+					</p>
+				{/if}
 				<div class="actions">
 					<Button type="submit" loading={submitting}>Upload &amp; pratinjau</Button>
 				</div>
@@ -116,6 +138,24 @@
 	.actions {
 		display: flex;
 		justify-content: flex-end;
+	}
+
+	.auto-create {
+		display: flex;
+		align-items: flex-start;
+		gap: var(--space-2);
+		font-size: var(--font-size-sm);
+		color: var(--text-2);
+	}
+
+	.auto-create input {
+		margin-top: 2px;
+	}
+
+	.auto-create-hint {
+		margin: -var(--space-2) 0 0 var(--space-6);
+		color: var(--text-3);
+		font-size: var(--font-size-xs);
 	}
 
 	.form-alert {

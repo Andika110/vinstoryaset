@@ -43,6 +43,8 @@ export const actions: Actions = {
 			return fail(400, { error: 'Pilih file Excel atau CSV yang akan diimpor.' });
 		}
 
+		const autoCreate = form.get('auto_create') === 'on';
+
 		const displayName = file.name.replace(/[^\w.\- ()]/g, '').slice(0, 120) || 'import';
 		try {
 			const buffer = Buffer.from(await file.arrayBuffer());
@@ -51,7 +53,8 @@ export const actions: Actions = {
 				actor,
 				definition.key,
 				parsed.fileName,
-				parsed.rows
+				parsed.rows,
+				autoCreate
 			);
 			throw redirect(303, `/admin/import/${definition.key}/preview?token=${preview.token}`);
 		} catch (err) {

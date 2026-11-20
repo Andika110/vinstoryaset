@@ -73,13 +73,16 @@ export async function resetTestDatabase(): Promise<void> {
 		await sql.unsafe(`
 			DO $$
 			DECLARE
-				table_name text;
+				table_list text;
 			BEGIN
-				FOR table_name IN
-					SELECT tablename FROM pg_tables WHERE schemaname = 'public'
-				LOOP
-					EXECUTE format('TRUNCATE TABLE public.%I RESTART IDENTITY CASCADE', table_name);
-				END LOOP;
+				SELECT string_agg(format('public.%I', tablename), ', ')
+				INTO table_list
+				FROM pg_tables
+				WHERE schemaname = 'public' AND tablename <> '__drizzle_migrations';
+
+				IF table_list IS NOT NULL THEN
+					EXECUTE 'TRUNCATE TABLE ' || table_list || ' RESTART IDENTITY CASCADE';
+				END IF;
 			END
 			$$;
 		`);

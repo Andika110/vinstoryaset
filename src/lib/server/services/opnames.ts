@@ -20,6 +20,7 @@ import {
 } from '#lib/server/db/schema/index.js';
 import { DomainError } from '#lib/server/errors.js';
 import { nextNumber } from '#lib/server/document-number.js';
+import { findAssetByCode, type AssetQrSummary } from '#lib/server/services/qr.js';
 
 export type OpnameStatus = 'draft' | 'in_progress' | 'completed' | 'cancelled';
 export type OpnameItemType = 'asset' | 'inventory';
@@ -419,7 +420,7 @@ export type OpnameDetail = {
 	conditions: { id: number; label: string }[];
 };
 
-async function loadLines(opnameId: number): Promise<OpnameLineView[]> {
+async function loadLines(opnameId: number, assetId?: number): Promise<OpnameLineView[]> {
 	const systemCondition = alias(assetConditions, 'system_condition');
 	const physicalCondition = alias(assetConditions, 'physical_condition');
 
@@ -450,7 +451,12 @@ async function loadLines(opnameId: number): Promise<OpnameLineView[]> {
 		.leftJoin(inventoryItems, eq(opnameLines.inventoryItemId, inventoryItems.id))
 		.leftJoin(units, eq(inventoryItems.unitId, units.id))
 		.leftJoin(users, eq(opnameLines.checkedBy, users.id))
-		.where(eq(opnameLines.opnameId, opnameId))
+		.where(
+			and(
+				eq(opnameLines.opnameId, opnameId),
+				assetId ? eq(opnameLines.assetId, assetId) : undefined
+			)
+		)
 		.orderBy(asc(opnameLines.id));
 
 	return rows.map((row) => {
@@ -826,6 +832,87 @@ export async function saveOpnameCount(
 				.where(eq(opnameLines.id, line.id));
 		}
 	});
+}
+
+export type OpnameScanOutcome =
+	| { kind: 'unknown'; code: string }
+	| { kind: 'outside'; code: string; asset: AssetQrSummary }
+	| {
+			kind: 'matched';
+			code: string;
+			line: OpnameLineView;
+			summary: OpnameSummary;
+			alreadyChecked: boolean;
+	  };
+
+/**
+ * Mencocokkan hasil scan QR aset dengan baris opname pada sesi berjalan.
+ * Bila aset ada di sesi dan belum dicek, baris langsung ditandai "Sesuai"
+ * memakai kondisi sistem. Pemindaian ulang tidak menimpa hasil yang sudah ada.
+ */
+export async function scanOpnameAsset(
+	actor: AuthUser,
+	id: number,
+	rawCode: string
+): Promise<OpnameScanOutcome> {
+	const header = await loadHeader(actor, id);
+	assertScope(actor, header.outletId);
+	if (!canManage(actor)) assertCan(actor, 'opname:assist');
+	else assertCan(actor, 'opname:write');
+
+	if (header.itemType !== 'asset') {
+		throw new DomainError('VALIDASI', 'Mode scan hanya tersedia untuk sesi opname aset.');
+	}
+	if (header.status !== 'in_progress') {
+		throw new DomainError('INVALID_STATUS', 'Sesi opname tidak sedang berjalan.');
+	}
+
+	const code = rawCode.trim();
+	if (!code) throw new DomainError('VALIDASI', 'Kode aset wajib diisi.');
+
+	const asset = await findAssetByCode(actor, code);
+	if (!asset) return { kind: 'unknown', code };
+
+	const [existing] = await db
+		.select({ id: opnameLines.id, notes: opnameLines.notes, checkedAt: opnameLines.checkedAt })
+		.from(opnameLines)
+		.where(and(eq(opnameLines.opnameId, id), eq(opnameLines.assetId, asset.id)))
+		.limit(1);
+
+	if (!existing) return { kind: 'outside', code: asset.assetCode, asset };
+
+	const [line] = await loadLines(id, asset.id);
+	if (!line) return { kind: 'outside', code: asset.assetCode, asset };
+
+	if (existing.checkedAt !== null) {
+		const lines = await loadLines(id);
+		return {
+			kind: 'matched',
+			code: asset.assetCode,
+			line,
+			summary: summarise(lines),
+			alreadyChecked: true
+		};
+	}
+
+	await saveOpnameCount(actor, id, [
+		{
+			lineId: line.id,
+			result: 'matched',
+			conditionId: null,
+			physicalQty: null,
+			notes: existing.notes
+		}
+	]);
+
+	const lines = await loadLines(id);
+	return {
+		kind: 'matched',
+		code: asset.assetCode,
+		line: lines.find((row) => row.id === line.id) ?? line,
+		summary: summarise(lines),
+		alreadyChecked: false
+	};
 }
 
 export async function completeOpname(actor: AuthUser, id: number): Promise<void> {

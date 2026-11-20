@@ -5,15 +5,28 @@ import { withAudit } from '#lib/server/audit.js';
 import { login } from '#lib/server/auth/service.js';
 import { db } from '#lib/server/db/index.js';
 import {
+	assetModels,
+	assets,
 	auditLogs,
+	brands,
 	docCounters,
+	inventoryCategories,
+	inventoryItems,
 	itemRequests,
 	stockBalances,
 	stockDocuments,
-	stockTransactions
+	stockTransactions,
+	units
 } from '#lib/server/db/schema/index.js';
 import { nextNumber } from '#lib/server/document-number.js';
 import { createAsset, listAssets } from '#lib/server/services/assets.js';
+import {
+	createImportPreview,
+	confirmImport,
+	getImportType,
+	parseImportFile
+} from '#lib/server/services/imports.js';
+import { createOpname, scanOpnameAsset, startOpname } from '#lib/server/services/opnames.js';
 import { createReceiving } from '#lib/server/services/receivings.js';
 import { createRequest } from '#lib/server/services/requests.js';
 import { createStockDocument } from '#lib/server/services/stock.js';
@@ -260,5 +273,268 @@ describe('idempotency & document numbers', () => {
 	test('withAudit menolak operasi tanpa audit', async () => {
 		const admin = await adminActor();
 		await expect(withAudit(admin, async () => 1)).rejects.toThrow('tanpa entri audit');
+	});
+});
+
+describe('opname scan', () => {
+	test('menandai aset sesuai saat scan dan mendeteksi duplikat', async () => {
+		const admin = await adminActor();
+
+		const assetId = await createAsset(admin, {
+			assetCode: 'QA-SCAN-1',
+			name: 'QA Scan Asset',
+			categoryId: fx.assetCategoryId,
+			brandId: null,
+			modelId: null,
+			serialNumber: 'SN-QA-SCAN-1',
+			purchaseDate: '2026-01-10',
+			warrantyExpiration: null,
+			acquisitionSource: null,
+			acquisitionCost: null,
+			locationId: fx.hoLocationId,
+			conditionId: fx.conditionId,
+			description: null
+		});
+		expect(assetId).toBeGreaterThan(0);
+
+		const opnameId = await createOpname(admin, {
+			locationId: fx.hoLocationId,
+			itemType: 'asset',
+			notes: null
+		});
+		await startOpname(admin, opnameId);
+
+		const first = await scanOpnameAsset(admin, opnameId, 'QA-SCAN-1');
+		expect(first.kind).toBe('matched');
+		if (first.kind === 'matched') {
+			expect(first.alreadyChecked).toBe(false);
+			expect(first.line.isChecked).toBe(true);
+			expect(first.line.result).toBe('matched');
+			expect(first.summary.checked).toBe(1);
+		}
+
+		const second = await scanOpnameAsset(admin, opnameId, 'QA-SCAN-1');
+		expect(second.kind).toBe('matched');
+		if (second.kind === 'matched') {
+			expect(second.alreadyChecked).toBe(true);
+		}
+	});
+
+	test('mengembalikan outside untuk aset di lokasi lain', async () => {
+		const admin = await adminActor();
+
+		await createAsset(admin, {
+			assetCode: 'QA-SCAN-OUT',
+			name: 'QA Outside Asset',
+			categoryId: fx.assetCategoryId,
+			brandId: null,
+			modelId: null,
+			serialNumber: 'SN-QA-SCAN-OUT',
+			purchaseDate: '2026-01-10',
+			warrantyExpiration: null,
+			acquisitionSource: null,
+			acquisitionCost: null,
+			locationId: fx.outletLocationId,
+			conditionId: fx.conditionId,
+			description: null
+		});
+
+		await createAsset(admin, {
+			assetCode: 'QA-SCAN-HO',
+			name: 'QA HO Asset',
+			categoryId: fx.assetCategoryId,
+			brandId: null,
+			modelId: null,
+			serialNumber: 'SN-QA-SCAN-HO',
+			purchaseDate: '2026-01-10',
+			warrantyExpiration: null,
+			acquisitionSource: null,
+			acquisitionCost: null,
+			locationId: fx.hoLocationId,
+			conditionId: fx.conditionId,
+			description: null
+		});
+
+		const opnameId = await createOpname(admin, {
+			locationId: fx.hoLocationId,
+			itemType: 'asset',
+			notes: null
+		});
+		await startOpname(admin, opnameId);
+
+		const outcome = await scanOpnameAsset(admin, opnameId, 'QA-SCAN-OUT');
+		expect(outcome.kind).toBe('outside');
+	});
+
+	test('mengembalikan unknown untuk kode yang tidak dikenal', async () => {
+		const admin = await adminActor();
+
+		await createAsset(admin, {
+			assetCode: 'QA-SCAN-HO2',
+			name: 'QA HO Asset 2',
+			categoryId: fx.assetCategoryId,
+			brandId: null,
+			modelId: null,
+			serialNumber: 'SN-QA-SCAN-HO2',
+			purchaseDate: '2026-01-10',
+			warrantyExpiration: null,
+			acquisitionSource: null,
+			acquisitionCost: null,
+			locationId: fx.hoLocationId,
+			conditionId: fx.conditionId,
+			description: null
+		});
+
+		const opnameId = await createOpname(admin, {
+			locationId: fx.hoLocationId,
+			itemType: 'asset',
+			notes: null
+		});
+		await startOpname(admin, opnameId);
+
+		const outcome = await scanOpnameAsset(admin, opnameId, 'NOPE-999');
+		expect(outcome.kind).toBe('unknown');
+	});
+
+	test('menolak opname non-aset', async () => {
+		const admin = await adminActor();
+		const opnameId = await createOpname(admin, {
+			locationId: fx.hoLocationId,
+			itemType: 'inventory',
+			notes: null
+		});
+		await expect(scanOpnameAsset(admin, opnameId, 'QA-SCAN-1')).rejects.toThrow();
+	});
+
+	test('outlet tidak dapat scan sesi outlet lain', async () => {
+		const admin = await adminActor();
+		const outlet = await outletActor();
+
+		await createAsset(admin, {
+			assetCode: 'QA-SCAN-HO3',
+			name: 'QA HO Asset 3',
+			categoryId: fx.assetCategoryId,
+			brandId: null,
+			modelId: null,
+			serialNumber: 'SN-QA-SCAN-HO3',
+			purchaseDate: '2026-01-10',
+			warrantyExpiration: null,
+			acquisitionSource: null,
+			acquisitionCost: null,
+			locationId: fx.hoLocationId,
+			conditionId: fx.conditionId,
+			description: null
+		});
+
+		const opnameId = await createOpname(admin, {
+			locationId: fx.hoLocationId,
+			itemType: 'asset',
+			notes: null
+		});
+		await startOpname(admin, opnameId);
+
+		await expect(scanOpnameAsset(outlet, opnameId, 'QA-SCAN-HO3')).rejects.toThrow();
+	});
+});
+
+describe('import auto-create master data', () => {
+	test('membuat kategori, satuan, dan brand yang belum ada saat autoCreate aktif', async () => {
+		const admin = await adminActor();
+		const csv = [
+			'item_code,name,category,unit,brand,description,is_active',
+			'QA-AUTO-1,QA Auto Item,NetAutoCat,netunit,NetBrand,desc,TRUE'
+		].join('\n');
+
+		const definition = getImportType('inventory-item');
+		const parsed = await parseImportFile(definition, 'auto.csv', Buffer.from(csv));
+		const preview = await createImportPreview(
+			admin,
+			'inventory-item',
+			parsed.fileName,
+			parsed.rows,
+			true
+		);
+
+		expect(preview.validCount).toBe(1);
+		expect(preview.autoCreated.inventoryCategories).toContain('NetAutoCat');
+		expect(preview.autoCreated.units).toContain('netunit');
+		expect(preview.autoCreated.brands).toContain('NetBrand');
+
+		const { batchId } = await confirmImport(admin, preview.token);
+		expect(batchId).toBeGreaterThan(0);
+
+		const item = await db
+			.select({ id: inventoryItems.id })
+			.from(inventoryItems)
+			.where(eq(inventoryItems.itemCode, 'QA-AUTO-1'));
+		expect(item).toHaveLength(1);
+
+		const category = await db
+			.select({ id: inventoryCategories.id })
+			.from(inventoryCategories)
+			.where(eq(inventoryCategories.name, 'NetAutoCat'));
+		expect(category).toHaveLength(1);
+
+		const unit = await db.select({ id: units.id }).from(units).where(eq(units.name, 'netunit'));
+		expect(unit).toHaveLength(1);
+
+		const brand = await db
+			.select({ id: brands.id })
+			.from(brands)
+			.where(eq(brands.name, 'NetBrand'));
+		expect(brand).toHaveLength(1);
+	});
+
+	test('tanpa autoCreate, baris dengan master data tidak dikenal tetap invalid', async () => {
+		const admin = await adminActor();
+		const csv = [
+			'item_code,name,category,unit,brand,description,is_active',
+			'QA-AUTO-2,QA Auto Item 2,UnknownCat,unknownunit,,desc,TRUE'
+		].join('\n');
+
+		const definition = getImportType('inventory-item');
+		const parsed = await parseImportFile(definition, 'auto2.csv', Buffer.from(csv));
+		const preview = await createImportPreview(
+			admin,
+			'inventory-item',
+			parsed.fileName,
+			parsed.rows,
+			false
+		);
+
+		expect(preview.validCount).toBe(0);
+		expect(preview.invalidCount).toBe(1);
+	});
+
+	test('membuat model aset yang belum ada saat autoCreate aktif', async () => {
+		const admin = await adminActor();
+		const csv = [
+			'asset_code,name,category,outlet_code,location_code,condition,brand,model',
+			'QA-AUTO-ASET-1,QA Auto Asset,Laptop,HO,HO-IT,Baik,Dell,ProBook 440 G9'
+		].join('\n');
+
+		const definition = getImportType('asset');
+		const parsed = await parseImportFile(definition, 'auto-asset.csv', Buffer.from(csv));
+		const preview = await createImportPreview(admin, 'asset', parsed.fileName, parsed.rows, true);
+
+		expect(preview.validCount).toBe(1);
+		expect(preview.autoCreated.brands).toContain('Dell');
+		expect(preview.autoCreated.models).toContain('ProBook 440 G9');
+
+		const { batchId } = await confirmImport(admin, preview.token);
+		expect(batchId).toBeGreaterThan(0);
+
+		const asset = await db
+			.select({ id: assets.id, modelId: assets.modelId })
+			.from(assets)
+			.where(eq(assets.assetCode, 'QA-AUTO-ASET-1'));
+		expect(asset).toHaveLength(1);
+
+		const model = await db
+			.select({ id: assetModels.id })
+			.from(assetModels)
+			.where(eq(assetModels.name, 'ProBook 440 G9'));
+		expect(model).toHaveLength(1);
+		expect(asset[0].modelId).toBe(model[0].id);
 	});
 });

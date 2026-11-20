@@ -66,6 +66,31 @@
 			</div>
 		{/if}
 
+		{#if preview.autoCreated && (preview.autoCreated.inventoryCategories.length || preview.autoCreated.units.length || preview.autoCreated.brands.length || preview.autoCreated.assetCategories.length || preview.autoCreated.conditions.length)}
+			<div class="notice-alert">
+				<Alert tone="info" title="Master data dibuat otomatis">
+					{#if preview.autoCreated.inventoryCategories.length}
+						Kategori inventory: {preview.autoCreated.inventoryCategories.join(', ')}.
+					{/if}
+					{#if preview.autoCreated.units.length}
+						Satuan: {preview.autoCreated.units.join(', ')}.
+					{/if}
+					{#if preview.autoCreated.brands.length}
+						Brand: {preview.autoCreated.brands.join(', ')}.
+					{/if}
+					{#if preview.autoCreated.assetCategories.length}
+						Kategori aset: {preview.autoCreated.assetCategories.join(', ')}.
+					{/if}
+					{#if preview.autoCreated.conditions.length}
+						Kondisi: {preview.autoCreated.conditions.join(', ')}.
+					{/if}
+					{#if preview.autoCreated.models.length}
+						Model: {preview.autoCreated.models.join(', ')}.
+					{/if}
+				</Alert>
+			</div>
+		{/if}
+
 		<form method="POST" class="confirm-form" onsubmit={() => (submitting = true)}>
 			<Button type="submit" disabled={!canConfirm} loading={submitting}>
 				Konfirmasi import ({preview.validCount} baris)
